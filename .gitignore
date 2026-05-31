@@ -1,0 +1,5 @@
+.env
+coverage.out, *.test
+bin/, api, dist/
+.idea/, .vscode/ (опционально)
+*.sql
