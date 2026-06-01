@@ -1,5 +1,8 @@
 .env
-coverage.out, *.test
-bin/, api, dist/
-.idea/, .vscode/ (опционально)
+coverage.out,
+*.test
+bin/api
+dist/
+.idea/
+.vscode/
 *.sql
