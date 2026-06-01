@@ -1,3 +1,8 @@
+BIN := bin/api
+ifeq ($(OS),Windows_NT)
+	BIN := bin/api.exe
+endif
+
 test-unit:
 	go test ./internal/...
 
@@ -7,4 +12,4 @@ test-integration:
 test: test-unit test-integration
 
 build:
-	go build -o bin/api .
+	go build -o $(BIN) ./cmd/api
