@@ -18,3 +18,19 @@ func TestLoad(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, locStr, cfg.DBHost)
 }
+
+func TestLoad_MissingDBHost(t *testing.T) {
+	t.Setenv("DB_HOST", "")
+	cfg, err := config.Load()
+	require.Nil(t, cfg)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "DBHost")
+}
+
+func TestLoad_InvalidHTTPPort(t *testing.T) {
+	t.Setenv("DB_HOST", "localhost")
+	t.Setenv("HTTP_PORT", "0")
+	_, err := config.Load()
+	require.Error(t, err)
+	require.ErrorContains(t, err, "HTTPPort")
+}

@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_USER: avia
       POSTGRES_PASSWORD: avia
-      POSTGRES_DB: postgres
+      POSTGRES_DB: demo
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

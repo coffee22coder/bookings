@@ -8,11 +8,28 @@ Pet-проект на Go + PostgreSQL: API для работы с брониро
 - Docker (PostgreSQL)
 - GNU Make (опционально; на Windows — [GnuWin32 Make](https://gnuwin32.sourceforge.net/packages/make.htm))
 
-## Run
-
-Точка входа приложения — `cmd/api`:
+## Quick start
 
 ```bash
+# 1. PostgreSQL
+docker compose up -d
+
+# 2. Локальный конфиг (не коммитится)
+cp .env.example .env   # Windows: copy .env.example .env
+
+# 3. Запуск API
+make run
+```
+
+При старте `cmd/api` подгружает `.env` через `godotenv` (только dev-удобство), затем читает переменные окружения в typed `config.Config` через `envconfig`.
+
+## Run
+
+Точка входа — `cmd/api`:
+
+```bash
+make run
+# или
 go run ./cmd/api
 ```
 
@@ -21,14 +38,45 @@ go run ./cmd/api
 ```bash
 make build
 ./bin/api          # macOS / Linux
-.\bin\api.exe      # Windows (если Makefile собрал с .exe)
+.\bin\api.exe      # Windows
 ```
 
-Проверка, что весь проект компилируется:
+Проверка компиляции:
 
 ```bash
 go build ./...
 ```
+
+Без валидного конфига (например, пустой `DB_HOST`) приложение завершится с `exit 1`.
+
+## Configuration
+
+Конфигурация — [12-factor](https://12factor.net/config): значения приходят из **environment variables**, не из кода.
+
+| Файл / механизм | Назначение |
+|---|---|
+| `.env.example` | шаблон переменных (в git) |
+| `.env` | локальные значения (в `.gitignore`) |
+| `godotenv.Load()` | dev: читает `.env` → `os.Environ` |
+| `config.Load()` | читает `os.Environ` → `Config` struct |
+
+Переменные:
+
+| Env | Описание | Default |
+|---|---|---|
+| `HTTP_PORT` | порт HTTP API | `8080` |
+| `DB_HOST` | хост PostgreSQL | — (required) |
+| `DB_PORT` | порт PostgreSQL | `5432` |
+| `DB_USER` | пользователь БД | — |
+| `DB_PASSWORD` | пароль БД | — |
+| `DB_NAME` | имя базы | — |
+| `DB_SSLMODE` | SSL mode для pgx | `disable` |
+
+**macOS / Linux** — альтернатива `.env`: экспорт переменных в shell или [direnv](https://direnv.net/).
+
+**Windows** — достаточно `.env` + `godotenv.Load()` в `main`.
+
+**Production / Docker** — env задаётся в `docker-compose` или оркестраторе; `.env` файла может не быть.
 
 ## Project layout
 
@@ -48,6 +96,8 @@ bookings/
 │   │   ├── http/            # HTTP handlers, middleware, DTO
 │   │   └── postgres/        # реализация репозиториев через pgx
 │   └── testutil/            # общие helpers для тестов
+├── test/
+│   └── integration/         # integration-тесты (build tag integration)
 ├── docs/
 │   ├── PROJECT.md
 │   └── TASKS.md
@@ -72,25 +122,81 @@ bookings/
 
 ## Testing
 
-Unit-тесты (быстрые, без внешних зависимостей):
+### Unit-тесты
+
+Быстрые, без Docker и PostgreSQL:
 
 ```bash
 make test-unit
 ```
 
-Integration-тесты (с build tag `integration`, требуют Docker/PostgreSQL):
+### Integration-тесты
+
+Требуют **запущенный PostgreSQL** и переменные `DB_*` (те же, что для `make run`).
+
+**Перед запуском:**
+
+```bash
+docker compose up -d
+cp .env.example .env   # Windows: copy .env.example .env
+# отредактируй .env под свой Postgres (DB_HOST, DB_PORT, DB_NAME, …)
+```
+
+Integration-тесты лежат в `test/integration/` и помечены build tag:
+
+```go
+//go:build integration
+```
+
+Запуск:
 
 ```bash
 make test-integration
+# или
+go test -tags=integration -v ./test/integration/...
 ```
 
-Все тесты:
+Локально тесты подгружают `.env` из корня репозитория. В CI переменные задают через env (файл `.env` не обязателен).
+
+**Пример export переменных (без `.env` файла):**
+
+bash / macOS / Linux:
+
+```bash
+export HTTP_PORT=8080
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_USER=avia
+export DB_PASSWORD=avia
+export DB_NAME=demo
+export DB_SSLMODE=disable
+
+make test-integration
+```
+
+PowerShell:
+
+```powershell
+$env:HTTP_PORT="8080"
+$env:DB_HOST="localhost"
+$env:DB_PORT="5432"
+$env:DB_USER="avia"
+$env:DB_PASSWORD="avia"
+$env:DB_NAME="demo"
+$env:DB_SSLMODE="disable"
+
+make test-integration
+```
+
+**Важно:** `DB_NAME` должен указывать на базу, где импортирован дамп (схема `bookings`). Если подключиться к пустой базе `postgres`, тесты ping пройдут, но запросы к таблицам упадут.
+
+### Все тесты
 
 ```bash
 make test
 ```
 
-Подробный вывод:
+Подробный вывод unit-тестов:
 
 ```bash
 go test -v ./internal/...
@@ -99,7 +205,7 @@ go test -v ./internal/...
 На Windows, если `make` не в `PATH`:
 
 ```powershell
-& "C:\Program Files (x86)\GnuWin32\bin\make.exe" test-unit
+& "C:\Program Files (x86)\GnuWin32\bin\make.exe" test-integration
 ```
 
 ## Database
@@ -108,6 +214,17 @@ PostgreSQL поднимается через Docker:
 
 ```bash
 docker compose up -d
+docker compose ps
 ```
 
-Переменные окружения — см. `.env.example`.
+Параметры подключения — в `.env` (см. `.env.example`). DSN собирается в `internal/config` методом `DSN()`; пароль и DSN в лог не пишутся.
+
+## Make targets
+
+| Target | Команда |
+|---|---|
+| `make run` | `go run ./cmd/api` |
+| `make build` | сборка в `bin/api` |
+| `make test-unit` | быстрые unit-тесты |
+| `make test-integration` | integration-тесты (`-tags=integration`) |
+| `make test` | unit + integration |
