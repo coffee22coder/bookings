@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -37,8 +38,14 @@ func (s *Server) Run() error {
 	return http.ListenAndServe(addr, s.router)
 }
 
+type Str struct {
+	status string
+}
+
 func (s *Server) routes() {
 	s.router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Health"))
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(struct{ Status string }{Status: "ok"})
+
 	})
 }
