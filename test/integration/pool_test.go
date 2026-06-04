@@ -25,6 +25,7 @@ func TestPool_Ping(t *testing.T) {
 
 	pool, err := postgres.NewPool(ctx, *cfg)
 	require.NoError(t, err)
+
 	require.NotNil(t, pool)
 	pool.Close()
 }
