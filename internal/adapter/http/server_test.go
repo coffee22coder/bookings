@@ -70,7 +70,7 @@ func TestServerHealth(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 			cfg := &config.Config{HTTPPort: 8080}
-			srv := httpadapter.NewServer(cfg, logger, fakeDB{})
+			srv := httpadapter.NewServer(cfg, logger, fakeDB{}, &httpadapter.Services{})
 			rec := httptest.NewRecorder()
 			req := httptest.NewRequest(tc.method, tc.path, nil)
 			if tc.reqID != "" {
@@ -125,7 +125,7 @@ func TestServerReady(t *testing.T) {
 			} else {
 				db = fakeDB{}
 			}
-			srv := httpadapter.NewServer(cfg, logger, db)
+			srv := httpadapter.NewServer(cfg, logger, db, &httpadapter.Services{})
 			rec := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/ready", nil)
 
@@ -143,7 +143,7 @@ func TestServerReady(t *testing.T) {
 func TestRecoverMiddleware(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	cfg := &config.Config{HTTPPort: 8080}
-	srv := httpadapter.NewServer(cfg, logger, fakeDB{})
+	srv := httpadapter.NewServer(cfg, logger, fakeDB{}, &httpadapter.Services{})
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
 	srv.Handler().ServeHTTP(rec, req)

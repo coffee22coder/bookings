@@ -13,6 +13,7 @@ import (
 	httpadapter "github.com/coffee22coder/bookings/internal/adapter/http"
 	"github.com/coffee22coder/bookings/internal/adapter/postgres"
 	"github.com/coffee22coder/bookings/internal/config"
+	"github.com/coffee22coder/bookings/internal/service"
 	"github.com/joho/godotenv"
 )
 
@@ -43,7 +44,9 @@ func main() {
 	}
 	logger.Info("db ok", "flights_count", count)
 
-	server := httpadapter.NewServer(cfg, logger, p)
+	services := NewServices(p)
+
+	server := httpadapter.NewServer(cfg, logger, p, services)
 
 	httpServer := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.HTTPPort),
@@ -69,4 +72,13 @@ func main() {
 		logger.Error("HTTP sever shutdown failed", slog.Attr{Key: "error", Value: slog.StringValue(err.Error())})
 	}
 
+}
+
+func NewServices(db *postgres.Pool) *httpadapter.Services {
+
+	repo := postgres.New(db)
+
+	return &httpadapter.Services{
+		Airports: service.New(repo),
+	}
 }

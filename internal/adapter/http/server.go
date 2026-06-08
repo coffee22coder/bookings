@@ -9,23 +9,30 @@ import (
 
 	"github.com/coffee22coder/bookings/internal/config"
 	"github.com/coffee22coder/bookings/internal/port"
+	"github.com/coffee22coder/bookings/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-type Server struct {
-	cfg    *config.Config
-	logger *slog.Logger
-	router chi.Router
-	db     port.DBPinger
+type Services struct {
+	Airports *service.AirportService
 }
 
-func NewServer(cfg *config.Config, logger *slog.Logger, db port.DBPinger) *Server {
+type Server struct {
+	cfg      *config.Config
+	logger   *slog.Logger
+	router   chi.Router
+	db       port.DBPinger
+	services *Services
+}
+
+func NewServer(cfg *config.Config, logger *slog.Logger, db port.DBPinger, services *Services) *Server {
 	s := &Server{
-		cfg:    cfg,
-		logger: logger,
-		router: chi.NewRouter(),
-		db:     db,
+		cfg:      cfg,
+		logger:   logger,
+		router:   chi.NewRouter(),
+		db:       db,
+		services: services,
 	}
 
 	s.router.Use(middleware.RequestID)
@@ -74,5 +81,20 @@ func (s *Server) routes() {
 
 	s.router.Get("/panic", func(w http.ResponseWriter, r *http.Request) {
 		panic("boom")
+	})
+
+	s.router.Get("/api/v1/airports", func(w http.ResponseWriter, r *http.Request) {
+		limit := 5
+		offset := 0
+		airports, err := s.services.Airports.List(r.Context(), limit, offset)
+		if err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(JSONResponse{
+				Status:     "down",
+				ErrMessage: err.Error(),
+			})
+			return
+		}
+		json.NewEncoder(w).Encode(airports)
 	})
 }
