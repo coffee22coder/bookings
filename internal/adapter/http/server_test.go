@@ -3,6 +3,7 @@ package http_test
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -137,4 +138,14 @@ func TestServerReady(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRecoverMiddleware(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	cfg := &config.Config{HTTPPort: 8080}
+	srv := httpadapter.NewServer(cfg, logger, fakeDB{})
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/panic", nil)
+	srv.Handler().ServeHTTP(rec, req)
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
 }

@@ -2,8 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	httpadapter "github.com/coffee22coder/bookings/internal/adapter/http"
 	"github.com/coffee22coder/bookings/internal/adapter/postgres"
@@ -21,9 +26,9 @@ func main() {
 		logger.Error("Error config", slog.Attr{Key: "error", Value: slog.StringValue(err.Error())})
 		os.Exit(1)
 	}
-	logger.Info("api starting", "http_port", cfg.HTTPPort)
 
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	p, err := postgres.NewPool(ctx, *cfg)
 
@@ -40,9 +45,28 @@ func main() {
 
 	server := httpadapter.NewServer(cfg, logger, p)
 
-	if err := server.Run(); err != nil {
-		logger.Error("http server failed", slog.Attr{Key: "error", Value: slog.StringValue(err.Error())})
+	httpServer := &http.Server{
+		Addr:              fmt.Sprintf(":%d", cfg.HTTPPort),
+		Handler:           server.Handler(),
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	os.Exit(0)
+	go func() {
+		logger.Info("HTTP server starting", "http_port", cfg.HTTPPort)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("Failed to start server", slog.Attr{Key: "error", Value: slog.StringValue(err.Error())})
+			stop()
+		}
+	}()
+
+	<-ctx.Done()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = httpServer.Shutdown(shutdownCtx)
+	if err != nil {
+		logger.Error("HTTP sever shutdown failed", slog.Attr{Key: "error", Value: slog.StringValue(err.Error())})
+	}
+
 }

@@ -3,7 +3,6 @@ package http
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -30,6 +29,7 @@ func NewServer(cfg *config.Config, logger *slog.Logger, db port.DBPinger) *Serve
 	}
 
 	s.router.Use(middleware.RequestID)
+	s.router.Use(middleware.Recoverer)
 
 	s.routes()
 
@@ -38,12 +38,6 @@ func NewServer(cfg *config.Config, logger *slog.Logger, db port.DBPinger) *Serve
 
 func (s *Server) Handler() http.Handler {
 	return s.router
-}
-
-func (s *Server) Run() error {
-	addr := fmt.Sprintf(":%d", s.cfg.HTTPPort)
-	s.logger.Info("listening", "addr", addr)
-	return http.ListenAndServe(addr, s.router)
 }
 
 type JSONResponse struct {
@@ -76,5 +70,9 @@ func (s *Server) routes() {
 		json.NewEncoder(w).Encode(JSONResponse{
 			Status: "ok",
 		})
+	})
+
+	s.router.Get("/panic", func(w http.ResponseWriter, r *http.Request) {
+		panic("boom")
 	})
 }
