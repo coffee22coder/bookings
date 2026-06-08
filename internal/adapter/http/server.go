@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/coffee22coder/bookings/internal/config"
@@ -86,6 +87,32 @@ func (s *Server) routes() {
 	s.router.Get("/api/v1/airports", func(w http.ResponseWriter, r *http.Request) {
 		limit := 5
 		offset := 0
+		var err error
+		limitStr := r.URL.Query().Get("limit")
+		if limitStr != "" {
+			limit, err = strconv.Atoi(limitStr)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(JSONResponse{
+					Status:     "down",
+					ErrMessage: err.Error(),
+				})
+				return
+			}
+		}
+		offsetStr := r.URL.Query().Get("offset")
+		if offsetStr != "" {
+			offset, err = strconv.Atoi(offsetStr)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				json.NewEncoder(w).Encode(JSONResponse{
+					Status:     "down",
+					ErrMessage: err.Error(),
+				})
+				return
+			}
+		}
+
 		airports, err := s.services.Airports.List(r.Context(), limit, offset)
 		if err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
@@ -96,5 +123,18 @@ func (s *Server) routes() {
 			return
 		}
 		json.NewEncoder(w).Encode(airports)
+	})
+
+	s.router.Get("/api/v1/airports/count", func(w http.ResponseWriter, r *http.Request) {
+		count, err := s.services.Airports.Count(r.Context())
+		if err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(JSONResponse{
+				Status:     "down",
+				ErrMessage: err.Error(),
+			})
+			return
+		}
+		json.NewEncoder(w).Encode(count)
 	})
 }

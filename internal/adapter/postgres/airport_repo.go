@@ -3,8 +3,6 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/coffee22coder/bookings/internal/domain"
 )
@@ -26,28 +24,28 @@ func New(db *Pool) *AirportRepo {
 
 func (r *AirportRepo) List(ctx context.Context, limit int, offset int) ([]domain.Airport, error) {
 	list := make([]domain.Airport, 0, limit)
-	rows, err := r.db.pool.Query(ctx, "SELECT * FROM bookings.airports LIMIT=$1 OFFSET=$2", &limit, &offset)
+	rows, err := r.db.pool.Query(ctx, `SELECT
+				airport_code,
+				airport_name,
+				city,
+				country,
+				coordinates[0],
+				coordinates[1],
+				timezone
+		FROM bookings.airports_data
+		LIMIT $1 OFFSET $2`,
+		limit, offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var code, coordinates, timezone string
+		var code, timezone string
 		var name, city, country localizedText
+		var lon, lat float64
 
-		err = rows.Scan(&code, &name, &city, &country, &coordinates, &timezone)
-		coordinates = strings.Trim(coordinates, "()")
-		parseCoordinate := strings.Split(coordinates, ",")
-		if len(parseCoordinate) != 2 {
-			return nil, fmt.Errorf("invalid coordinates: %s", coordinates)
-		}
-		var floatCoordinates [2]float64
-		for idx, val := range parseCoordinate {
-			floatVal, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				return nil, err
-			}
-			floatCoordinates[idx] = floatVal
+		if err := rows.Scan(&code, &name, &city, &country, &lon, &lat, &timezone); err != nil {
+			return nil, fmt.Errorf("scan airport: %w", err)
 		}
 		airport := domain.Airport{
 			Code: code,
@@ -63,7 +61,7 @@ func (r *AirportRepo) List(ctx context.Context, limit int, offset int) ([]domain
 				En: country.En,
 				Ru: country.Ru,
 			},
-			Coordinates: floatCoordinates,
+			Coordinates: [2]float64{lon, lat},
 			Timezone:    timezone,
 		}
 		list = append(list, airport)
@@ -77,6 +75,6 @@ func (r *AirportRepo) List(ctx context.Context, limit int, offset int) ([]domain
 
 func (r *AirportRepo) Count(ctx context.Context) (int, error) {
 	var count int
-	err := r.db.pool.QueryRow(ctx, "SELECT COUNT(*) FROM bookings.airports").Scan(&count)
+	err := r.db.pool.QueryRow(ctx, "SELECT COUNT(*) FROM bookings.airports_data").Scan(&count)
 	return count, err
 }
