@@ -1,7 +1,8 @@
 package http_test
 
 import (
-	"io"
+	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -13,39 +14,127 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHealth_Returns200(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	cfg := &config.Config{HTTPPort: 8080}
-	srv := httpadapter.NewServer(cfg, logger)
-
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
-	rec := httptest.NewRecorder()
-
-	srv.Handler().ServeHTTP(rec, req)
-	require.Equal(t, http.StatusOK, rec.Code)
-	body, err := io.ReadAll(rec.Body)
-	require.NoError(t, err)
-	require.JSONEq(t, `{"Status":"ok"}`, string(body))
+type fakeDB struct {
+	err error
 }
 
-func TestHealth_POST_Returns405(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	cfg := &config.Config{HTTPPort: 8080}
-	srv := httpadapter.NewServer(cfg, logger)
-
-	req := httptest.NewRequest(http.MethodPost, "/health", nil)
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
-	require.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+func (f fakeDB) Ping(ctx context.Context) error {
+	return f.err
 }
 
-func TestHealth_ReturnsJSON(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	cfg := &config.Config{HTTPPort: 8080}
-	srv := httpadapter.NewServer(cfg, logger)
+type testCaseHealth struct {
+	name           string
+	method         string
+	path           string
+	reqID          string
+	wantStatusCode int
+	wantJSON       string
+	wantReqID      string
+}
 
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
-	rec := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rec, req)
-	require.JSONEq(t, `{"Status":"ok"}`, rec.Body.String())
+func TestServerHealth(t *testing.T) {
+	tests := []testCaseHealth{
+		{
+			name:           "Returns200",
+			method:         http.MethodGet,
+			path:           "/health",
+			wantStatusCode: http.StatusOK,
+			wantJSON:       `{"status":"ok"}`,
+		},
+		{
+			name:           "Returns405",
+			method:         http.MethodPost,
+			path:           "/health",
+			wantStatusCode: http.StatusMethodNotAllowed,
+		},
+		{
+			name:           "ReturnsJSON",
+			method:         http.MethodGet,
+			path:           "/health",
+			wantStatusCode: http.StatusOK,
+			wantJSON:       `{"status":"ok"}`,
+		},
+		{
+			name:           "RequestID",
+			method:         http.MethodGet,
+			path:           "/health",
+			wantStatusCode: http.StatusOK,
+			wantJSON:       `{"status":"ok"}`,
+			reqID:          "test-123",
+			wantReqID:      "test-123",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+			cfg := &config.Config{HTTPPort: 8080}
+			srv := httpadapter.NewServer(cfg, logger, fakeDB{})
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(tc.method, tc.path, nil)
+			if tc.reqID != "" {
+				req.Header.Set("X-Request-Id", tc.reqID)
+			}
+
+			srv.Handler().ServeHTTP(rec, req)
+
+			require.Equal(t, tc.wantStatusCode, rec.Code)
+
+			if tc.wantJSON != "" {
+				require.JSONEq(t, tc.wantJSON, rec.Body.String())
+			}
+
+			if tc.wantReqID != "" {
+				require.Equal(t, tc.wantReqID, rec.Header().Get("X-Request-Id"))
+			}
+		})
+	}
+}
+
+type testCaseReady struct {
+	name           string
+	dbErr          error
+	wantStatusCode int
+	wantJSON       string
+}
+
+func TestServerReady(t *testing.T) {
+	tests := []testCaseReady{
+		{
+			name:           "DB ping Error",
+			dbErr:          errors.New("down"),
+			wantStatusCode: http.StatusServiceUnavailable,
+			wantJSON:       `{"status":"down", "error": "down"}`,
+		},
+		{
+			name:           "DB ping OK",
+			dbErr:          nil,
+			wantStatusCode: http.StatusOK,
+			wantJSON:       `{"status":"ok"}`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+			cfg := &config.Config{HTTPPort: 8080}
+			var db fakeDB
+			if tc.dbErr != nil {
+				db = fakeDB{err: errors.New("down")}
+			} else {
+				db = fakeDB{}
+			}
+			srv := httpadapter.NewServer(cfg, logger, db)
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/ready", nil)
+
+			srv.Handler().ServeHTTP(rec, req)
+
+			require.Equal(t, tc.wantStatusCode, rec.Code)
+
+			if tc.wantJSON != "" {
+				require.JSONEq(t, tc.wantJSON, rec.Body.String())
+			}
+		})
+	}
 }

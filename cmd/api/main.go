@@ -25,22 +25,20 @@ func main() {
 
 	ctx := context.Background()
 
-	pool, err := postgres.NewPool(ctx, *cfg)
+	p, err := postgres.NewPool(ctx, *cfg)
 
 	if err != nil {
 		logger.Error("Error postgres", slog.Attr{Key: "error", Value: slog.StringValue(err.Error())})
 		os.Exit(1)
 	}
-	defer pool.Close()
+	defer p.Close()
 	var count int
-	err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM bookings.flights").Scan(&count)
-	if err != nil {
-		logger.Error("db query failed", "error", err)
-		os.Exit(1)
+	if count, err = p.FligthsCount(ctx); err != nil {
+		logger.Error("Error postgres", slog.Attr{Key: "error", Value: slog.StringValue(err.Error())})
 	}
 	logger.Info("db ok", "flights_count", count)
 
-	server := httpadapter.NewServer(cfg, logger)
+	server := httpadapter.NewServer(cfg, logger, p)
 
 	if err := server.Run(); err != nil {
 		logger.Error("http server failed", slog.Attr{Key: "error", Value: slog.StringValue(err.Error())})

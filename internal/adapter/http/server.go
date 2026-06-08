@@ -1,27 +1,35 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/coffee22coder/bookings/internal/config"
+	"github.com/coffee22coder/bookings/internal/port"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 type Server struct {
 	cfg    *config.Config
 	logger *slog.Logger
 	router chi.Router
+	db     port.DBPinger
 }
 
-func NewServer(cfg *config.Config, logger *slog.Logger) *Server {
+func NewServer(cfg *config.Config, logger *slog.Logger, db port.DBPinger) *Server {
 	s := &Server{
 		cfg:    cfg,
 		logger: logger,
 		router: chi.NewRouter(),
+		db:     db,
 	}
+
+	s.router.Use(middleware.RequestID)
 
 	s.routes()
 
@@ -38,14 +46,35 @@ func (s *Server) Run() error {
 	return http.ListenAndServe(addr, s.router)
 }
 
-type Str struct {
-	status string
+type JSONResponse struct {
+	Status     string `json:"status"`
+	ErrMessage string `json:"error,omitempty"`
 }
 
 func (s *Server) routes() {
 	s.router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(struct{ Status string }{Status: "ok"})
+		s.logger.Info("health", "request_id", middleware.GetReqID(r.Context()))
+		id := middleware.GetReqID(r.Context())
+		w.Header().Set(middleware.RequestIDHeader, id)
+		json.NewEncoder(w).Encode(JSONResponse{Status: "ok"})
+	})
 
+	s.router.Get("/ready", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		w.Header().Set("Content-Type", "application/json")
+		if err := s.db.Ping(ctx); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(JSONResponse{
+				Status:     "down",
+				ErrMessage: err.Error(),
+			})
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(JSONResponse{
+			Status: "ok",
+		})
 	})
 }
