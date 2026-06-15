@@ -4,20 +4,15 @@ package integration_test
 
 import (
 	"context"
-	"io"
-	"log/slog"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
-	httpadapter "github.com/coffee22coder/bookings/internal/adapter/http"
 	"github.com/coffee22coder/bookings/internal/adapter/postgres"
 	"github.com/coffee22coder/bookings/internal/config"
 	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/require"
 )
 
-func TestPool_Ping(t *testing.T) {
+func TestAirportRepo_List(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -30,30 +25,34 @@ func TestPool_Ping(t *testing.T) {
 
 	pool, err := postgres.NewPool(ctx, *cfg)
 	require.NoError(t, err)
+	t.Cleanup(pool.Close)
 
-	require.NotNil(t, pool)
-	pool.Close()
+	repo := postgres.New(pool)
+
+	airports, err := repo.List(ctx, 5, 0)
+	require.NoError(t, err)
+
+	require.Len(t, airports, 5)
 }
 
-func TestReady_WithRealPool_Returns200(t *testing.T) {
+func TestAirportRepo_Count(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
 	_ = godotenv.Load("../../.env")
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
 	cfg, err := config.Load()
 	require.NoError(t, err)
+
 	ctx := context.Background()
-	p, err := postgres.NewPool(ctx, *cfg)
+
+	pool, err := postgres.NewPool(ctx, *cfg)
 	require.NoError(t, err)
-	t.Cleanup(func() {
-		p.Close()
-	})
-	services := &httpadapter.Services{}
-	server := httpadapter.NewServer(cfg, logger, p, services)
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
-	server.Handler().ServeHTTP(rec, req)
-	require.Equal(t, http.StatusOK, rec.Code)
-	require.JSONEq(t, `{"status":"ok"}`, rec.Body.String())
+	t.Cleanup(pool.Close)
+
+	repo := postgres.New(pool)
+	count, err := repo.Count(ctx)
+	require.NoError(t, err)
+
+	require.Greater(t, count, 0)
 }

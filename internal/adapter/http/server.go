@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
+	"github.com/coffee22coder/bookings/internal/adapter/http/dto"
+	"github.com/coffee22coder/bookings/internal/adapter/http/handler"
 	"github.com/coffee22coder/bookings/internal/config"
 	"github.com/coffee22coder/bookings/internal/port"
 	"github.com/coffee22coder/bookings/internal/service"
@@ -48,18 +49,15 @@ func (s *Server) Handler() http.Handler {
 	return s.router
 }
 
-type JSONResponse struct {
-	Status     string `json:"status"`
-	ErrMessage string `json:"error,omitempty"`
-}
-
 func (s *Server) routes() {
+	airportHandler := handler.NewAirportHandler(s.services.Airports)
+
 	s.router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		s.logger.Info("health", "request_id", middleware.GetReqID(r.Context()))
 		id := middleware.GetReqID(r.Context())
 		w.Header().Set(middleware.RequestIDHeader, id)
-		json.NewEncoder(w).Encode(JSONResponse{Status: "ok"})
+		json.NewEncoder(w).Encode(dto.JSONResponse{Status: "ok"})
 	})
 
 	s.router.Get("/ready", func(w http.ResponseWriter, r *http.Request) {
@@ -68,14 +66,14 @@ func (s *Server) routes() {
 		w.Header().Set("Content-Type", "application/json")
 		if err := s.db.Ping(ctx); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			json.NewEncoder(w).Encode(JSONResponse{
+			json.NewEncoder(w).Encode(dto.JSONResponse{
 				Status:     "down",
 				ErrMessage: err.Error(),
 			})
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(JSONResponse{
+		json.NewEncoder(w).Encode(dto.JSONResponse{
 			Status: "ok",
 		})
 	})
@@ -84,57 +82,7 @@ func (s *Server) routes() {
 		panic("boom")
 	})
 
-	s.router.Get("/api/v1/airports", func(w http.ResponseWriter, r *http.Request) {
-		limit := 5
-		offset := 0
-		var err error
-		limitStr := r.URL.Query().Get("limit")
-		if limitStr != "" {
-			limit, err = strconv.Atoi(limitStr)
-			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(JSONResponse{
-					Status:     "down",
-					ErrMessage: err.Error(),
-				})
-				return
-			}
-		}
-		offsetStr := r.URL.Query().Get("offset")
-		if offsetStr != "" {
-			offset, err = strconv.Atoi(offsetStr)
-			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(JSONResponse{
-					Status:     "down",
-					ErrMessage: err.Error(),
-				})
-				return
-			}
-		}
+	s.router.Get("/api/v1/airports", airportHandler.List)
 
-		airports, err := s.services.Airports.List(r.Context(), limit, offset)
-		if err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			json.NewEncoder(w).Encode(JSONResponse{
-				Status:     "down",
-				ErrMessage: err.Error(),
-			})
-			return
-		}
-		json.NewEncoder(w).Encode(airports)
-	})
-
-	s.router.Get("/api/v1/airports/count", func(w http.ResponseWriter, r *http.Request) {
-		count, err := s.services.Airports.Count(r.Context())
-		if err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			json.NewEncoder(w).Encode(JSONResponse{
-				Status:     "down",
-				ErrMessage: err.Error(),
-			})
-			return
-		}
-		json.NewEncoder(w).Encode(count)
-	})
+	s.router.Get("/api/v1/airports/count", airportHandler.Count)
 }

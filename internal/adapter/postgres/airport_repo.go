@@ -25,13 +25,13 @@ func New(db *Pool) *AirportRepo {
 func (r *AirportRepo) List(ctx context.Context, limit int, offset int) ([]domain.Airport, error) {
 	list := make([]domain.Airport, 0, limit)
 	rows, err := r.db.pool.Query(ctx, `SELECT
-				airport_code,
-				airport_name,
-				city,
-				country,
-				coordinates[0],
-				coordinates[1],
-				timezone
+			airport_code,
+			airport_name,
+			city,
+			country,
+			coordinates[0],
+			coordinates[1],
+			timezone
 		FROM bookings.airports_data
 		LIMIT $1 OFFSET $2`,
 		limit, offset)

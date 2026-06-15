@@ -18,6 +18,9 @@ func New(repo port.AirportRepository) *AirportService {
 }
 
 func (s *AirportService) List(ctx context.Context, limit int, offset int) ([]domain.Airport, error) {
+	if limit == 0 {
+		limit = 20
+	}
 	return s.repo.List(ctx, limit, offset)
 }
 

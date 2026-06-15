@@ -41,8 +41,8 @@ func (p *Pool) Ping(ctx context.Context) error {
 	return nil
 }
 
-func (p *Pool) FligthsCount(ctx context.Context) (int, error) {
-	var count int
-	err := p.pool.QueryRow(ctx, "SELECT COUNT(*) FROM bookings.flights").Scan(&count)
-	return count, err
-}
+// func (p *Pool) FligthsCount(ctx context.Context) (int, error) {
+// 	var count int
+// 	err := p.pool.QueryRow(ctx, "SELECT COUNT(*) FROM bookings.flights").Scan(&count)
+// 	return count, err
+// }

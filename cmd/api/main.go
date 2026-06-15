@@ -34,15 +34,15 @@ func main() {
 	p, err := postgres.NewPool(ctx, *cfg)
 
 	if err != nil {
-		logger.Error("Error postgres", slog.Attr{Key: "error", Value: slog.StringValue(err.Error())})
+		logger.Error("Error datebase", slog.Attr{Key: "error", Value: slog.StringValue(err.Error())})
 		os.Exit(1)
 	}
 	defer p.Close()
-	var count int
-	if count, err = p.FligthsCount(ctx); err != nil {
-		logger.Error("Error postgres", slog.Attr{Key: "error", Value: slog.StringValue(err.Error())})
-	}
-	logger.Info("db ok", "flights_count", count)
+	// var count int
+	// if count, err = p.FligthsCount(ctx); err != nil {
+	// 	logger.Error("Error datebase", slog.Attr{Key: "error", Value: slog.StringValue(err.Error())})
+	// }
+	// logger.Info("db ok", "flights_count", count)
 
 	services := NewServices(p)
 
