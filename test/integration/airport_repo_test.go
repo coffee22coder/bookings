@@ -27,7 +27,7 @@ func TestAirportRepo_List(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(pool.Close)
 
-	repo := postgres.New(pool)
+	repo := postgres.NewAeroportRepo(pool)
 
 	airports, err := repo.List(ctx, 5, 0)
 	require.NoError(t, err)
@@ -50,7 +50,7 @@ func TestAirportRepo_Count(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(pool.Close)
 
-	repo := postgres.New(pool)
+	repo := postgres.NewAeroportRepo(pool)
 	count, err := repo.Count(ctx)
 	require.NoError(t, err)
 

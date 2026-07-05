@@ -16,7 +16,7 @@ type localizedText struct {
 	Ru string `json:"ru"`
 }
 
-func New(db *Pool) *AirportRepo {
+func NewAeroportRepo(db *Pool) *AirportRepo {
 	return &AirportRepo{
 		db: db,
 	}

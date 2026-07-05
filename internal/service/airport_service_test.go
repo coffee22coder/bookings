@@ -52,7 +52,7 @@ func TestAirportService_List(t *testing.T) {
 	ctx := context.Background()
 
 	repo := &fakeRepo{}
-	airportService := service.New(repo)
+	airportService := service.AirportServiceNew(repo)
 
 	airports, err := airportService.List(ctx, 3, 0)
 	require.NoError(t, err)
@@ -63,7 +63,7 @@ func TestAirportService_Count(t *testing.T) {
 	ctx := context.Background()
 
 	repo := &fakeRepo{}
-	airportService := service.New(repo)
+	airportService := service.AirportServiceNew(repo)
 
 	count, err := airportService.Count(ctx)
 	require.NoError(t, err)
@@ -74,7 +74,7 @@ func TestAirportService_DefaultLimit(t *testing.T) {
 	ctx := context.Background()
 
 	repo := &fakeRepo{}
-	airportService := service.New(repo)
+	airportService := service.AirportServiceNew(repo)
 
 	airports, err := airportService.List(ctx, 0, 0)
 	require.NoError(t, err)

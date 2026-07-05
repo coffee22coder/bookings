@@ -56,7 +56,7 @@ func (r *fakeRepo) Count(ctx context.Context) (int, error) {
 
 func TestAirportHandler_InvalidLimit(t *testing.T) {
 	repo := &fakeRepo{}
-	service := service.New(repo)
+	service := service.AirportServiceNew(repo)
 	airportHandler := handler.NewAirportHandler(service)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/airports?limit=-1&offset=0", nil)

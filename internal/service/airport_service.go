@@ -11,7 +11,7 @@ type AirportService struct {
 	repo port.AirportRepository
 }
 
-func New(repo port.AirportRepository) *AirportService {
+func AirportServiceNew(repo port.AirportRepository) *AirportService {
 	return &AirportService{
 		repo: repo,
 	}

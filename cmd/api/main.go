@@ -76,9 +76,11 @@ func main() {
 
 func NewServices(db *postgres.Pool) *httpadapter.Services {
 
-	repo := postgres.New(db)
+	aeroportRepo := postgres.NewAeroportRepo(db)
+	flightRepo := postgres.NewFlightRepo(db)
 
 	return &httpadapter.Services{
-		Airports: service.New(repo),
+		Airports: service.AirportServiceNew(aeroportRepo),
+		Flights:  service.FlightServiceNew(flightRepo),
 	}
 }

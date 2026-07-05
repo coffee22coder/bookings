@@ -200,7 +200,7 @@ func TestServerAirports_OK(t *testing.T) {
 	cfg := &config.Config{HTTPPort: 8080}
 	var db fakeDB
 	srv := httpadapter.NewServer(cfg, logger, db, &httpadapter.Services{
-		Airports: service.New(&fakeRepo{gotError: false}),
+		Airports: service.AirportServiceNew(&fakeRepo{gotError: false}),
 	})
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/airports", nil)
@@ -220,7 +220,7 @@ func TestServerAirports_ErrorPath(t *testing.T) {
 	cfg := &config.Config{HTTPPort: 8080}
 	var db fakeDB
 	srv := httpadapter.NewServer(cfg, logger, db, &httpadapter.Services{
-		Airports: service.New(&fakeRepo{gotError: true}),
+		Airports: service.AirportServiceNew(&fakeRepo{gotError: true}),
 	})
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/airports", nil)
