@@ -17,9 +17,6 @@ func validFlightFilter(from, to, date string) error {
 		return fmt.Errorf("invalid params (from, to, date): %w", domain.ErrValid)
 	}
 
-	from = strings.ToUpper(strings.TrimSpace(from))
-	to = strings.ToUpper(strings.TrimSpace(to))
-
 	if !util.IsIATA(from) || !util.IsIATA(to) {
 		return fmt.Errorf("invalid airprot IATA code (from, to): %w", domain.ErrValid)
 	}
@@ -59,7 +56,7 @@ func (s *FlightService) List(
 			return nil, fmt.Errorf("invalid limit: %w", domain.ErrValid)
 		}
 		if limitInt < 0 || limitInt > 100 {
-			return nil, fmt.Errorf("invalid limit: %w", domain.ErrValid)
+			return nil, fmt.Errorf("invalid limit int: %w", domain.ErrValid)
 		}
 	}
 	if offset == "" {
@@ -70,13 +67,16 @@ func (s *FlightService) List(
 			return nil, fmt.Errorf("invalid offset: %w", domain.ErrValid)
 		}
 		if offsetInt < 0 {
-			return nil, fmt.Errorf("invalid offsetInt: %w", domain.ErrValid)
+			return nil, fmt.Errorf("invalid offset int: %w", domain.ErrValid)
 		}
 	}
 
 	if from == "" || to == "" || date == "" {
 		return nil, fmt.Errorf("invalid params (from, to, date): %w", domain.ErrValid)
 	}
+
+	from = strings.ToUpper(strings.TrimSpace(from))
+	to = strings.ToUpper(strings.TrimSpace(to))
 
 	err = validFlightFilter(from, to, date)
 	if err != nil {
@@ -97,6 +97,9 @@ func (s *FlightService) CountSearch(
 	from string,
 	to string,
 	date string) (int, error) {
+	from = strings.ToUpper(strings.TrimSpace(from))
+	to = strings.ToUpper(strings.TrimSpace(to))
+
 	err := validFlightFilter(from, to, date)
 	if err != nil {
 		return 0, err

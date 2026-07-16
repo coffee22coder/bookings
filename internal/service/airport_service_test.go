@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type fakeRepo struct {
+type fakeAeroportRepo struct {
 	gotLimit int
 }
 
-func (r *fakeRepo) List(ctx context.Context, limit int, offset int) ([]domain.Airport, error) {
+func (r *fakeAeroportRepo) List(ctx context.Context, limit int, offset int) ([]domain.Airport, error) {
 	r.gotLimit = limit
 	fakeAirports := []domain.Airport{
 		{
@@ -44,14 +44,14 @@ func (r *fakeRepo) List(ctx context.Context, limit int, offset int) ([]domain.Ai
 	return fakeAirports, nil
 }
 
-func (r *fakeRepo) Count(ctx context.Context) (int, error) {
+func (r *fakeAeroportRepo) Count(ctx context.Context) (int, error) {
 	return 5, nil
 }
 
 func TestAirportService_List(t *testing.T) {
 	ctx := context.Background()
 
-	repo := &fakeRepo{}
+	repo := &fakeAeroportRepo{}
 	airportService := service.AirportServiceNew(repo)
 
 	airports, err := airportService.List(ctx, 3, 0)
@@ -62,7 +62,7 @@ func TestAirportService_List(t *testing.T) {
 func TestAirportService_Count(t *testing.T) {
 	ctx := context.Background()
 
-	repo := &fakeRepo{}
+	repo := &fakeAeroportRepo{}
 	airportService := service.AirportServiceNew(repo)
 
 	count, err := airportService.Count(ctx)
@@ -73,7 +73,7 @@ func TestAirportService_Count(t *testing.T) {
 func TestAirportService_DefaultLimit(t *testing.T) {
 	ctx := context.Background()
 
-	repo := &fakeRepo{}
+	repo := &fakeAeroportRepo{}
 	airportService := service.AirportServiceNew(repo)
 
 	airports, err := airportService.List(ctx, 0, 0)
