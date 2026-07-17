@@ -8,6 +8,7 @@ import (
 	"github.com/coffee22coder/bookings/internal/adapter/http/dto"
 	"github.com/coffee22coder/bookings/internal/domain"
 	"github.com/coffee22coder/bookings/internal/service"
+	"github.com/go-chi/chi/v5"
 )
 
 type FlightHandler struct {
@@ -80,10 +81,35 @@ func (h *FlightHandler) CountSearch(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(dto.FlightsCount{Total: count})
 }
 
+func (h *FlightHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	flightID := chi.URLParam(r, "id")
+
+	flight, err := h.service.GetByID(r.Context(), flightID)
+	if err != nil {
+		writeServiceError(w, err)
+		return
+	}
+	flightRes := dto.FlightResponse{
+		FlightID:           flight.FlightID,
+		RouteNo:            flight.RouteNo,
+		Status:             flight.Status,
+		DepartureAirport:   flight.DepartureAirport,
+		ArrivalAirport:     flight.ArrivalAirport,
+		ScheduledDeparture: flight.ScheduledDeparture,
+		ScheduledArrival:   flight.ScheduledArrival,
+		ActualDeparture:    flight.ActualDeparture,
+		ActualArrival:      flight.ActualArrival,
+	}
+	json.NewEncoder(w).Encode(flightRes)
+}
+
 func writeServiceError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, domain.ErrValid):
 		w.WriteHeader(http.StatusBadRequest)
+	case errors.Is(err, domain.ErrNotFound):
+		w.WriteHeader(http.StatusNotFound)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 	}

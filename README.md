@@ -219,6 +219,163 @@ docker compose ps
 
 Параметры подключения — в `.env` (см. `.env.example`). DSN собирается в `internal/config` методом `DSN()`; пароль и DSN в лог не пишутся.
 
+`docker-compose.yml` пробрасывает Postgres на хост-порт **5433** (`5433:5432`). Для локального API укажи в `.env`: `DB_PORT=5433`.
+
+### Консоль psql
+
+Интерактивная сессия в контейнере:
+
+```bash
+docker exec -it avia_postgres psql -U avia -d demo
+```
+
+PowerShell (Windows) — та же команда:
+
+```powershell
+docker exec -it avia_postgres psql -U avia -d demo
+```
+
+Полезное внутри psql:
+
+```sql
+\dt bookings.*          -- таблицы схемы
+\d bookings.flights     -- структура таблицы
+SET search_path TO bookings, public;
+\q                      -- выход
+```
+
+Одноразовый запрос без входа в консоль:
+
+```bash
+docker exec avia_postgres psql -U avia -d demo -c "SELECT COUNT(*) FROM bookings.flights;"
+```
+
+### Импорт дампа
+
+Схема и данные — из дампа `demo-20250901-3m.sql` (или `.sql.gz`). Файл не в git (см. `.gitignore`).
+
+```bash
+# распаковать .gz (Git Bash / WSL)
+gunzip -k demo-20250901-3m.sql.gz
+
+# импорт
+docker cp demo-20250901-3m.sql avia_postgres:/tmp/dump.sql
+docker exec avia_postgres psql -U avia -d demo -f /tmp/dump.sql
+
+# или без распаковки на диске
+docker cp demo-20250901-3m.sql.gz avia_postgres:/tmp/dump.sql.gz
+docker exec avia_postgres bash -c "gunzip -f /tmp/dump.sql.gz && psql -U avia -d demo -f /tmp/dump.sql"
+```
+
+Проверка:
+
+```bash
+docker exec avia_postgres psql -U avia -d demo -c "\dt bookings.*"
+```
+
+### Схема `bookings`
+
+Источник правды — дамп. Ниже — ER-модель для ориентира (PK/FK и типы уточняй через `\d bookings.<table>` в psql).
+
+```mermaid
+erDiagram
+    airports_data ||--o{ routes : "departure_airport / arrival_airport"
+    airplanes_data ||--o{ routes : "aircraft_code"
+    airplanes_data ||--o{ seats : "aircraft_code"
+
+    routes ||--o{ flights : "route_no"
+
+    bookings ||--o{ tickets : "book_ref"
+    tickets ||--o{ segments : "ticket_no"
+    flights ||--o{ segments : "flight_id"
+
+    tickets ||--o{ boarding_passes : "ticket_no"
+    flights ||--o{ boarding_passes : "flight_id"
+
+    airports_data {
+        text airport_code PK
+        jsonb airport_name
+        jsonb city
+        jsonb country
+        point coordinates
+        text timezone
+    }
+
+    airplanes_data {
+        text aircraft_code PK
+        jsonb model
+        int range
+    }
+
+    routes {
+        text route_no PK
+        text departure_airport
+        text arrival_airport
+        text aircraft_code FK
+        time local_departure_time
+        time local_arrival_time
+    }
+
+    flights {
+        int flight_id PK
+        text flight_no
+        text route_no FK
+        timestamptz scheduled_departure
+        timestamptz scheduled_arrival
+        timestamptz actual_departure
+        timestamptz actual_arrival
+        text status
+    }
+
+    bookings {
+        char book_ref PK
+        timestamptz book_date
+        numeric total_amount
+    }
+
+    tickets {
+        text ticket_no PK
+        char book_ref FK
+        text passenger_name
+        text passenger_id
+    }
+
+    segments {
+        text ticket_no FK
+        int flight_id FK
+        text fare_conditions
+        numeric amount
+    }
+
+    boarding_passes {
+        text ticket_no FK
+        int flight_id FK
+        int boarding_no
+        text seat_no
+    }
+
+    seats {
+        text aircraft_code FK
+        text seat_no
+        text fare_conditions
+    }
+```
+
+| Таблица | Роль в API |
+|---|---|
+| `airports_data` | Sprint 1 — `GET /airports` |
+| `routes` | JOIN с `flights` (from/to аэропорты) |
+| `flights` | `GET /flights`, `GET /flights/{id}` |
+| `bookings` | Sprint 2–3 — read/create бронирования |
+| `tickets` | пассажиры внутри брони |
+| `segments` | связь ticket ↔ flight, цена, класс |
+| `airplanes_data`, `seats` | справочники (вне scope v1) |
+| `boarding_passes`, `airplanes_tmp` | не используются в v1 |
+
+**Read flights (текущий код):** `flights` JOIN `routes` ON `route_no`.
+
+**Read/create booking (Sprint 2–3):** `bookings` → `tickets` → `segments` → `flights`.
+
 ## Make targets
 
 | Target | Команда |

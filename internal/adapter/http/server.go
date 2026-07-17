@@ -91,4 +91,6 @@ func (s *Server) routes() {
 	s.router.Get("/api/v1/flights", flightHandler.List)
 
 	s.router.Get("/api/v1/flights/count", flightHandler.CountSearch)
+
+	s.router.Get("/api/v1/flights/{id}", flightHandler.GetByID)
 }

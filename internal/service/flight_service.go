@@ -111,3 +111,22 @@ func (s *FlightService) CountSearch(
 		to,
 		date)
 }
+
+func (s *FlightService) GetByID(
+	ctx context.Context,
+	flightId string,
+) (*domain.Flight, error) {
+	if flightId == "" {
+		return nil, fmt.Errorf("invalid flightId: %w", domain.ErrValid)
+	}
+
+	id, err := strconv.ParseInt(flightId, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid flightId: %w", domain.ErrValid)
+	}
+	if id <= 0 {
+		return nil, fmt.Errorf("invalid flightId: %w", domain.ErrValid)
+	}
+	return s.repo.GetByID(ctx, id)
+
+}

@@ -20,4 +20,9 @@ type FlightRepository interface {
 		from string,
 		to string,
 		date string) (int, error)
+
+	GetByID(
+		ctx context.Context,
+		id int64,
+	) (*domain.Flight, error)
 }

@@ -35,4 +35,9 @@ func TestFlightRepo(t *testing.T) {
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, count, len(flights))
+
+	flight, err := repo.GetByID(ctx, testutil.FlightID)
+	require.NoError(t, err)
+
+	require.EqualValues(t, flight.RouteNo, testutil.RouteNo)
 }

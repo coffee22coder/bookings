@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 type fakeFlightRepo struct {
 	gotLimit  int
 	gotOffset int
+	gotID     int64
 }
 
 func (r *fakeFlightRepo) List(
@@ -59,6 +61,29 @@ func (r *fakeFlightRepo) CountSearch(ctx context.Context, from string, to string
 	return 5, nil
 }
 
+func (r *fakeFlightRepo) GetByID(ctx context.Context, id int64) (*domain.Flight, error) {
+	if id == 777 {
+		return nil, domain.ErrNotFound
+	}
+
+	now := time.Now()
+	r.gotID = id
+
+	fakeFlight := &domain.Flight{
+		FlightID:           testutil.FlightID,
+		RouteNo:            testutil.RouteNo,
+		Status:             testutil.Status,
+		DepartureAirport:   testutil.DepartureAirport,
+		ArrivalAirport:     testutil.ArrivalAirport,
+		ScheduledDeparture: now,
+		ScheduledArrival:   now,
+		ActualDeparture:    &now,
+		ActualArrival:      &now,
+	}
+
+	return fakeFlight, nil
+}
+
 type testCase struct {
 	name      string
 	wantError bool
@@ -72,8 +97,7 @@ type testCase struct {
 func TestFlightService_Validation(t *testing.T) {
 	tests := []testCase{
 		{
-			name:      "OK valid",
-			wantError: false,
+
 			gotFrom:   "asD",
 			gotTo:     "qWE",
 			gotDate:   "2025-10-01",
@@ -146,6 +170,65 @@ func TestFlightService_Validation(t *testing.T) {
 	}
 }
 
+type TestCaseGetById struct {
+	name      string
+	wantError bool
+	gotID     string
+}
+
+func TestFlightService_GetById(t *testing.T) {
+	tests := []TestCaseGetById{
+		{
+			name:      "OK valid",
+			wantError: false,
+			gotID:     "1123",
+		},
+		{
+			name:      "flight ID invalid",
+			wantError: true,
+			gotID:     "0",
+		},
+		{
+			name:      "flight ID not found",
+			wantError: true,
+			gotID:     "777",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			repo := &fakeFlightRepo{}
+
+			flightService := service.FlightServiceNew(repo)
+
+			flight, err := flightService.GetByID(ctx, tc.gotID)
+			if tc.wantError {
+				require.Error(t, err)
+				if tc.gotID == "777" {
+					require.True(t, errors.Is(err, domain.ErrNotFound))
+				} else {
+					require.True(t, errors.Is(err, domain.ErrValid))
+				}
+
+			} else {
+				if err != nil {
+					require.NoError(t, err)
+				}
+
+				intId, err := strconv.ParseInt(tc.gotID, 10, 64)
+				if err != nil {
+					require.NoError(t, err)
+				}
+
+				require.Equal(t, intId, repo.gotID)
+
+				require.Equal(t, testutil.FlightID, flight.FlightID)
+			}
+		})
+	}
+}
+
 var errRepoFailed = errors.New("repo failed")
 
 type errorFlightRepo struct{}
@@ -159,12 +242,19 @@ func (r *errorFlightRepo) List(
 	offset int) ([]domain.Flight, error) {
 	return nil, errRepoFailed
 }
+
 func (r *errorFlightRepo) CountSearch(
 	ctx context.Context,
 	from string,
 	to string,
 	date string) (int, error) {
 	return 0, errRepoFailed
+}
+
+func (r *errorFlightRepo) GetByID(
+	ctx context.Context,
+	id int64) (*domain.Flight, error) {
+	return nil, errRepoFailed
 }
 
 func TestFlightService_Error(t *testing.T) {

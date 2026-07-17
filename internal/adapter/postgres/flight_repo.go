@@ -2,10 +2,12 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/coffee22coder/bookings/internal/domain"
+	"github.com/jackc/pgx/v5"
 )
 
 type FlightRepo struct {
@@ -102,4 +104,52 @@ func (r *FlightRepo) CountSearch(
 	AND f.scheduled_departure >= $3::date
 	AND f.scheduled_departure <  $3::date + interval '1 day';`, from, to, date).Scan(&total)
 	return total, err
+}
+
+func (r *FlightRepo) GetByID(
+	ctx context.Context,
+	id int64,
+) (*domain.Flight, error) {
+	var routeNo, status, departureAirport, arrivalAirport string
+	var scheduledDeparture, scheduledArrival time.Time
+	var actualDeparture, actualArrival *time.Time
+
+	err := r.db.pool.QueryRow(ctx, `SELECT 
+		f.route_no,
+		f.status,
+		r.departure_airport,
+		r.arrival_airport,
+		f.scheduled_departure,
+		f.scheduled_arrival,
+		f.actual_departure,
+		f.actual_arrival FROM bookings.flights f
+		JOIN bookings.routes r ON f.route_no = r.route_no
+		WHERE f.flight_id = $1`, id).Scan(
+		&routeNo,
+		&status,
+		&departureAirport,
+		&arrivalAirport,
+		&scheduledDeparture,
+		&scheduledArrival,
+		&actualDeparture,
+		&actualArrival,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrNotFound
+		}
+		return nil, err
+	}
+	flight := domain.Flight{
+		FlightID:           id,
+		RouteNo:            routeNo,
+		Status:             status,
+		DepartureAirport:   departureAirport,
+		ArrivalAirport:     arrivalAirport,
+		ScheduledDeparture: scheduledDeparture,
+		ScheduledArrival:   scheduledArrival,
+		ActualDeparture:    actualDeparture,
+		ActualArrival:      actualArrival,
+	}
+	return &flight, nil
 }
