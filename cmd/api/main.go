@@ -11,6 +11,7 @@ import (
 	"time"
 
 	httpadapter "github.com/coffee22coder/bookings/internal/adapter/http"
+	"github.com/coffee22coder/bookings/internal/adapter/idgen"
 	"github.com/coffee22coder/bookings/internal/adapter/postgres"
 	"github.com/coffee22coder/bookings/internal/config"
 	"github.com/coffee22coder/bookings/internal/service"
@@ -79,8 +80,12 @@ func NewServices(db *postgres.Pool) *httpadapter.Services {
 	aeroportRepo := postgres.NewAeroportRepo(db)
 	flightRepo := postgres.NewFlightRepo(db)
 
+	genId := idgen.NewGenID(6)
+	bookingRepo := postgres.NewBookingRepo(db, genId)
+
 	return &httpadapter.Services{
 		Airports: service.AirportServiceNew(aeroportRepo),
 		Flights:  service.FlightServiceNew(flightRepo),
+		Bookings: service.BookingServiceNew(bookingRepo),
 	}
 }

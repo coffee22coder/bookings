@@ -19,6 +19,7 @@ import (
 type Services struct {
 	Airports *service.AirportService
 	Flights  *service.FlightService
+	Bookings *service.BookingSevice
 }
 
 type Server struct {
@@ -53,6 +54,7 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) routes() {
 	airportHandler := handler.NewAirportHandler(s.services.Airports)
 	flightHandler := handler.NewFlightHandler(s.services.Flights)
+	bookingHandler := handler.NewBookingHandler(s.services.Bookings)
 
 	s.router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -93,4 +95,6 @@ func (s *Server) routes() {
 	s.router.Get("/api/v1/flights/count", flightHandler.CountSearch)
 
 	s.router.Get("/api/v1/flights/{id}", flightHandler.GetByID)
+
+	s.router.Post("/api/v1/bookings", bookingHandler.Create)
 }
